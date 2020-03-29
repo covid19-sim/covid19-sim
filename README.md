@@ -3,6 +3,7 @@ A simulation to show the spread of covid-19 (or other diseases) given the impact
 
 ## List of parameters
 * Population density
+* Rate of transmission
 * Frequency of visiting central locations
 * Social distancing
 * Incubation period
