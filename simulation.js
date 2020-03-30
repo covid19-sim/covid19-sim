@@ -5,7 +5,14 @@ let canvas = document.getElementById('world');
 const CANVAS_HEIGHT = 800;
 const CANVAS_WIDTH = 800;
 const WALL_WIDTH = 5;
-const MAX_DIST_FORCE = 100; 
+const MAX_DIST_FORCE = 100;
+
+const distance_f = (a,b) => {
+    return Math.sqrt(Math.pow(a.x - b.x, 2) +  Math.pow(a.y - b.y, 2));
+}
+
+// setup KDTree
+let TREE = new kdTree([], distance_f, ["x", "y"]);
 
 //Setup Matter JS
 let engine = Matter.Engine.create();
@@ -29,23 +36,23 @@ const create_balls = (num, r) => {
 	// TODO: random color?, random force
 	let balls = [];
 	for (let i = 0; i < num; i++) {
-		// const rx = Math.floor( (CANVAS_WIDTH - 2*r) * Math.random()) + r;
-		// const ry = Math.floor( (CANVAS_HEIGHT - 2*r) * Math.random()) + r;
-		// const rvx = 3 * 2 * (Math.random() - 0.5);
-		// const rvy = 3 * 2 * (Math.random() - 0.5);
-		let rx, ry, rvx, rvy;
-		if (i === 0) {
-			rx = 100;
-			ry = 400;
-			rvx = 2;
-			rvy = 0;
-		}
-		else {
-			rx = 400;
-			ry = 400;
-			rvx = -2;
-			rvy = 0;
-		}
+		const rx = Math.floor( (CANVAS_WIDTH - 2*r) * Math.random()) + r;
+		const ry = Math.floor( (CANVAS_HEIGHT - 2*r) * Math.random()) + r;
+		const rvx = 3 * 2 * (Math.random() - 0.5);
+		const rvy = 3 * 2 * (Math.random() - 0.5);
+		// let rx, ry, rvx, rvy;
+		// if (i === 0) {
+		// 	rx = 100;
+		// 	ry = 400;
+		// 	rvx = 2;
+		// 	rvy = 0;
+		// }
+		// else {
+		// 	rx = 400;
+		// 	ry = 400;
+		// 	rvx = -2;
+		// 	rvy = 0;
+		// }
 		const rv = {'x': rvx, 'y': rvy};
 		let nb = Matter.Bodies.circle(rx, ry, r, {
 			render : {
@@ -104,46 +111,50 @@ const create_walls = () => {
 }
 
 const compute_fv = (b1, b2) => {
-	const dist = Math.sqrt((b1.position['x'] - b2.position['x'])**2 + (b1.position['y'] - b2.position['y'])**2);
+	const dist = Math.sqrt((b1['x'] - b2['x'])**2 + (b1['y'] - b2['y'])**2);
 	if (dist === 0) {
 		return Matter.Vector.create(0, 0);
 	}
-	const vdir = Matter.Vector.create(b1.position['x'] - b2.position['x'], b1.position['y'] - b2.position['y']); // points away from b2
-	const constant = 25/10000; // 5 pixels = 0.001 in the opposite direction
+	const vdir = Matter.Vector.create(b1['x'] - b2['x'], b1['y'] - b2['y']); // points away from b2
+	const constant = 50/10000; // 5 pixels = 0.001 in the opposite direction
 	return Matter.Vector.mult(vdir, constant/(dist**2));
 }
 
-const update = () => {
+const update_tree = () => {
 	for (let i = 0; i < balls.length; i++) {
-		const b = balls[i];
-		const x = b.position['x'];
-		const y = b.position['y'];
-		const tl = {'x': x - MAX_DIST_FORCE / 2, 'y': y - MAX_DIST_FORCE / 2};
-		const tr = {'x': x + MAX_DIST_FORCE / 2, 'y': y - MAX_DIST_FORCE / 2};
-		const br = {'x': x + MAX_DIST_FORCE / 2, 'y': y + MAX_DIST_FORCE / 2};
-		const bl = {'x': x - MAX_DIST_FORCE / 2, 'y': y + MAX_DIST_FORCE / 2};
+		TREE.insert(balls[i].position);
+	}
+}
 
-		const vs = Matter.Vertices.create([tl, tr, br, bl], b);
-		const bs = Matter.Bounds.create(vs);
-		
-		const matches = Matter.Query.region(balls, bs);
+const clean_tree = () => {
+	for (let i = 0; i < balls.length; i++) {
+		TREE.remove(balls[i].position);
+	}
+}
+
+
+const update = () => {
+	update_tree();
+	for (let i = 0; i < balls.length; i++) {
+		const body = balls[i];
+		const b = body.position
+		const matches = TREE.nearest(b, 10, 100);
 		if (matches.length <= 1) {
 			// there can be one match, the ball itself
 			continue;
 		}
-		console.log("had over 1 match");
-		let fv = compute_fv(b, matches[0]);
+		let fv = compute_fv(b, matches[0][0]);
 		for (let j = 1; j < matches.length; j++) {
-			fv = Matter.Vector.add(fv, compute_fv(b, matches[j]));
-			console.log('fv, body:', fv, i);
+			fv = Matter.Vector.add(fv, compute_fv(b, matches[j][0]));
 		}
-		Matter.Body.applyForce(b, b.position, fv);
+		Matter.Body.applyForce(body, b, fv);
 	}
+	clean_tree();
 }
 
-// Matter.Events.on(engine, "beforeUpdate", update)
+Matter.Events.on(engine, "beforeUpdate", update)
 
-const balls = create_balls(2000, 5);
+const balls = create_balls(500, 5);
 const walls = create_walls();
 Matter.World.add(world, balls);
 Matter.World.add(world, walls);
