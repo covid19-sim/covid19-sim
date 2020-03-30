@@ -42,19 +42,21 @@ function getRandomArbitrary(min, max) {
 
 var bodies = []
 // Create Walls
-topWall = Bodies.rectangle(400,1, 800,1, {isStatic: true});
-bottomWall = Bodies.rectangle(400,799, 800,1, {isStatic: true});
-leftWall = Bodies.rectangle(1, 400, 1, 800, {isStatic: true});
-rightWall = Bodies.rectangle(799, 400, 1, 800, {isStatic: true});
+let wallOptions = {inertia: Infinity, restitution: 1, isStatic: true, friction: 0, frictionAir: 0, frictionStatic: 0};
+topWall = Bodies.rectangle(400,1, 800,1, wallOptions);
+bottomWall = Bodies.rectangle(400,799, 800,1, wallOptions);
+leftWall = Bodies.rectangle(1, 400, 1, 800, wallOptions);
+rightWall = Bodies.rectangle(799, 400, 1, 800, wallOptions);
 bodies.push(topWall, bottomWall, leftWall, rightWall);
 
 // Create circles
 for (var i = 0; i < 2000; i++) {
   const x = getRandomIntInclusive(RADIUS, WIDTH-RADIUS);
   const y = getRandomIntInclusive(RADIUS, HEIGHT-RADIUS);
-  const circle = Bodies.circle(x, y, RADIUS);
+  const circleOptions = {inertia: Infinity, restitution: 1, friction: 0, frictionAir: 0, frictionStatic: 0};
+  const circle = Bodies.circle(x, y, RADIUS, circleOptions);
   const vx = 5 * getRandomArbitrary(-1, 1);
-  const vy = 5 * getRandomArbitrary(-1, 1);
+  const vy = 5 * getRandomArbitrary(-1, 1); 
   const velocity = {x: vx, y: vy};
   Matter.Body.setVelocity(circle, velocity);
   bodies.push(circle);
