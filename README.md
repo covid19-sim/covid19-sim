@@ -13,7 +13,8 @@ A simulation to show the spread of covid-19 (or other diseases) given the impact
 * Incubation period
   * Gaussian distribution with mean of 6 and std of 3.
 * Percent of asymptomatic people
-* Response time before implementing policies
+* Response delay before implementing policies
+  * Number of cases before policies like social distancing and whatnot get implemented. 
 * Time of recovery
 * Reinfection rate 
 * Death Rate
