@@ -25,6 +25,8 @@ const render = Render.create({
       height: CANVAS_HEIGHT,
       width: CANVAS_WIDTH,
       background: 'transparent',
+      wireframes: false, 
+      showAngleIndicator: false,
     },
 });
 
@@ -42,6 +44,9 @@ const getRandomArbitrary = (min, max) => {
 // Create Walls
 const createWalls = () => {
   let wallOptions = {
+    render: {
+      fillStyle: '#F35e66',
+    },
     inertia: Infinity, 
     restitution: 1, 
     isStatic: true, 
@@ -62,6 +67,11 @@ const createBalls = () => {
     const x = getRandomIntInclusive(RADIUS+WALL_THICKNESS, CANVAS_WIDTH-WALL_THICKNESS-RADIUS);
     const y = getRandomIntInclusive(RADIUS+WALL_THICKNESS, CANVAS_HEIGHT-WALL_THICKNESS-RADIUS);
     const ballOptions = {
+            render: {
+              fillStyle: '#F35e66',
+              strokeStyle: 'black',
+              lineWidth: 1,
+            },
             inertia: Infinity, 
             restitution: 1, 
             friction: 0, 
