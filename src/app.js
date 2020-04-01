@@ -7,7 +7,7 @@ var Engine = Matter.Engine,
 
 //constants
 const RADIUS = 5;
-const BALL_COUNT = 10;
+const BALL_COUNT = 1000;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 800;
 const WALL_THICKNESS = 20;
@@ -89,9 +89,9 @@ const compute_fv = (b1, b2) => {
 		return Matter.Vector.create(0, 0);
 	}
   let vdir = Matter.Vector.create(b1['x'] - b2['x'], b1['y'] - b2['y']); // points away from b2
-  // const constant = 50/10000; // 5 pixels = 0.001 in the opposite direction
-  vdir = Matter.Vector.normalize(vdir); // converts to a unit vector
-  const constant = 100;
+  const constant = 50/10000; // 5 pixels = 0.001 in the opposite direction
+  // vdir = Matter.Vector.normalize(vdir); // converts to a unit vector
+  // const constant = 100;
 	return Matter.Vector.mult(vdir, constant/(dist**2));
 }
 
