@@ -10,8 +10,8 @@ const RADIUS = 5;
 const BALL_COUNT = 1000;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 800;
-const WALL_THICKNESS = 20;
-const VEL_MULT = 6;
+const WALL_THICKNESS = 10;
+const VEL_MULT = 2;
 
 // create an engine
 const engine = Engine.create();
@@ -46,6 +46,7 @@ const createWalls = () => {
   let wallOptions = {
     render: {
       fillStyle: '#F35e66',
+      lineWidth: 0,
     },
     inertia: Infinity, 
     restitution: 1, 
