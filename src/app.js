@@ -40,8 +40,8 @@ const DECISION_STD = 30; // frames
 const LETHAL_PROBABILITY = 0.03
 
 // will be input from user
-const SOCIAL_DISTANCING_FCONSTANT = 10/1000; // 50/1000;
-const P_TO_CENTRAL_LOCATION = 0.05 // translates to every X frames, Y% chance per central location
+const SOCIAL_DISTANCING_FCONSTANT = 50/1000;
+const CENTRAL_LOCATION_PROBABILITY = 0.05 // translates to every X frames, Y% chance per central location
 
 let FRAME_COUNT = 0;
 let CENTRAL_LOCATIONS = [];
@@ -206,7 +206,7 @@ const handle_ball_to_central_location = (body) => {
     }
     let idx = -1;
     for (let j = 0; j < CENTRAL_LOCATIONS.length; j++) {
-      if (Math.random() < P_TO_CENTRAL_LOCATION) {
+      if (Math.random() < CENTRAL_LOCATION_PROBABILITY) {
         idx = j; // chose j
         break;
       }
