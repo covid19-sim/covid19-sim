@@ -7,11 +7,14 @@ var Engine = Matter.Engine,
 
 //constants
 const RADIUS = 5;
-const BALL_COUNT = 10;
+const BALL_COUNT = 500;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 800;
 const WALL_THICKNESS = 10;
-const VEL_MULT = 2;
+const MAX_INITIAL_VELOCITY = 2;
+const WALL_COLLISION_SCALER = 50/100000;
+const MIN_COLLISION_VELOCITY = 2;
+const SOCIAL_DISTANCING_CONSTANT = 50/1000;
 
 // create an engine
 const engine = Engine.create();
@@ -67,6 +70,13 @@ const createBalls = () => {
   for (var i = 0; i < BALL_COUNT; i++) {
     const x = getRandomIntInclusive(RADIUS+WALL_THICKNESS, CANVAS_WIDTH-WALL_THICKNESS-RADIUS);
     const y = getRandomIntInclusive(RADIUS+WALL_THICKNESS, CANVAS_HEIGHT-WALL_THICKNESS-RADIUS);
+    const vx = MAX_INITIAL_VELOCITY * getRandomArbitrary(-1, 1);
+    const vy = MAX_INITIAL_VELOCITY * getRandomArbitrary(-1, 1);
+    // let x = i === 0 ? 200 : 400;
+    // let y = 200;
+    // let vx = i === 0 ? 1.5 : -1.5;
+    // let vy = 0;
+
     const ballOptions = {
             render: {
               fillStyle: '#F35e66',
@@ -80,8 +90,6 @@ const createBalls = () => {
             frictionStatic: 0
           };
     const ball = Bodies.circle(x, y, RADIUS, ballOptions);
-    const vx = VEL_MULT * getRandomArbitrary(-1, 1);
-    const vy = VEL_MULT * getRandomArbitrary(-1, 1); 
     const velocity = {x: vx, y: vy};
     Matter.Body.setVelocity(ball, velocity);
     balls.push(ball);
@@ -100,10 +108,9 @@ const compute_fv = (b1, b2) => {
 		return Matter.Vector.create(0, 0);
 	}
   let vdir = Matter.Vector.create(b1['x'] - b2['x'], b1['y'] - b2['y']); // points away from b2
-  const constant = 50/1000; // 5 pixels = 0.001 in the opposite direction
   vdir = Matter.Vector.div(vdir, dist) // converts to a unit vector
   // const constant = 100;
-	return Matter.Vector.mult(vdir, constant/(dist**2));
+	return Matter.Vector.mult(vdir, SOCIAL_DISTANCING_CONSTANT/(dist**2));
 }
 
 const update_tree = () => {
@@ -118,11 +125,29 @@ const clean_tree = () => {
 	}
 }
 
+const handle_wall_collision = () => {
+  const top_f = Matter.Vector.create(0, -1 * WALL_COLLISION_SCALER);
+  const bottom_f = Matter.Vector.create(0, 1 * WALL_COLLISION_SCALER);
+  const left_f = Matter.Vector.create(1 * WALL_COLLISION_SCALER, 0);
+  const right_f = Matter.Vector.create(-1 * WALL_COLLISION_SCALER, 0);
+  const vectors = [top_f, bottom_f, left_f, right_f];
+  for (let i = 0; i < walls.length; i++) {
+    const bodies = Matter.Query.collides(walls[i], balls);
+    for (let j = 0; j < bodies.length; j++) {
+      const body = bodies[j]['bodyB'];
+      if (Matter.Vector.magnitude(body.velocity) >= MIN_COLLISION_VELOCITY) {
+        continue;
+      }
+      Matter.Body.applyForce(body, body.position, vectors[i]);
+    }
+  }
+}
+
 const update = () => {
   update_tree();
 	for (let i = 0; i < balls.length; i++) {
 		const body = balls[i];
-		const b = body.position
+    const b = body.position;
 		const matches = TREE.nearest(b, 10, 100);
 		if (matches.length <= 1) {
 			// there can be one match, the ball itself
@@ -134,7 +159,9 @@ const update = () => {
 		}
 		Matter.Body.applyForce(body, b, fv);
 	}
-	clean_tree();
+  clean_tree();
+  
+  handle_wall_collision();
 }
 
 // add all of the bodies to the world
