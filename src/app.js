@@ -14,12 +14,23 @@ const WALL_THICKNESS = 10;
 const MAX_INITIAL_VELOCITY = 2;
 const WALL_COLLISION_SCALER = 50/100000;
 const MIN_COLLISION_VELOCITY = 2;
+
 const CENTRAL_LOCATION_LENGTH = 20; // rectangle length
 const CENTRAL_LOCATION_DELAY = 60; // frames per check
 const CENTRAL_LOCATION_VELOCITY = 5;
 
+const STATUS = {
+      'UNINFECTED': 'blue',
+      'INFECTED': 'yellow',
+      'RECOVERED': 'green',
+      'DEAD': 'black'
+};
+const INITIAL_INFECTED = 1;
+const MAX_TRANSMISSION_DISTANCE = 40;
+const TRANSMISSION_PROBABILITY = 0.05;
+
 // will be input from user
-const SOCIAL_DISTANCING_FCONSTANT = 50/1000;
+const SOCIAL_DISTANCING_FCONSTANT = 10/1000; // 50/1000;
 const P_TO_CENTRAL_LOCATION = 0.05 // translates to every X frames, Y% chance per central location
 
 let FRAME_COUNT = 0;
@@ -88,7 +99,7 @@ const createBalls = () => {
 
     const ballOptions = {
             render: {
-              fillStyle: '#F35e66',
+              fillStyle: STATUS['UNINFECTED'],
               strokeStyle: 'black',
               lineWidth: 1,
             },
@@ -102,7 +113,16 @@ const createBalls = () => {
     const velocity = {x: vx, y: vy};
     Matter.Body.setVelocity(ball, velocity);
     balls.push(ball);
+
+    // additional properties
     ball.goToCentral = undefined;
+    if (i < INITIAL_INFECTED) {
+      ball.virusState = 'INFECTED';
+      ball.render.fillStyle = STATUS['INFECTED'];
+    }
+    else {
+      ball.virusState = 'UNINFECTED';
+    }
   }
   return balls;
 }
@@ -110,7 +130,7 @@ const createBalls = () => {
 const create_central_location = (cx, cy) => {
   let centralOpts = {
     render: {
-      fillStyle: '#F35e66',
+      fillStyle: 'black',
       lineWidth: 0,
     },
     isStatic: true, 
@@ -118,7 +138,7 @@ const create_central_location = (cx, cy) => {
     frictionAir: 0, 
     frictionStatic: 0
   };
-  const central = Bodies.rectangle(cx - CENTRAL_LOCATION_LENGTH/2, cy - CENTRAL_LOCATION_LENGTH/2, CENTRAL_LOCATION_LENGTH, CENTRAL_LOCATION_LENGTH, create_central_location);
+  const central = Bodies.rectangle(cx - CENTRAL_LOCATION_LENGTH/2, cy - CENTRAL_LOCATION_LENGTH/2, CENTRAL_LOCATION_LENGTH, CENTRAL_LOCATION_LENGTH, centralOpts);
   // turns off collisions
   central.collisionFilter = {
     'group': -1,
@@ -126,7 +146,7 @@ const create_central_location = (cx, cy) => {
     'mask': 0,
   };
   CENTRAL_LOCATIONS.push(central);
-  console.log(central);
+  // console.log(central);
   World.add(engine.world, central);
 };
 
@@ -135,8 +155,6 @@ const remove_central_location = (idx) => {
   CENTRAL_LOCATIONS.splice(idx, 1);
   World.remove(engine.world, central);
 }
-
-create_central_location(400, 400);
 
 const handle_balls_to_central_location = () => {
   if (CENTRAL_LOCATIONS.length === 0) {
@@ -189,13 +207,16 @@ const handle_balls_to_central_location = () => {
   }
 }
 
+
 // Gets distance between two (x,y) points
 const distance_f = (a,b) => {
   return Math.sqrt(Math.pow(a.x - b.x, 2) +  Math.pow(a.y - b.y, 2));
 }
 
-const compute_fv = (b1, b2) => {
-	const dist = Math.sqrt((b1['x'] - b2['x'])**2 + (b1['y'] - b2['y'])**2);
+const compute_fv = (body1, body2) => {
+  const b1 = body1['position'];
+  const b2 = body2['position'];
+	const dist = distance_f(b1, b2);
 	if (dist === 0) {
 		return Matter.Vector.create(0, 0);
 	}
@@ -207,14 +228,26 @@ const compute_fv = (b1, b2) => {
 
 const update_tree = () => {
 	for (let i = 0; i < balls.length; i++) {
-		TREE.insert(balls[i].position);
+		TREE.insert(balls[i]);
 	}
 }
 
 const clean_tree = () => {
 	for (let i = 0; i < balls.length; i++) {
-		TREE.remove(balls[i].position);
+		TREE.remove(balls[i]);
 	}
+}
+
+const handle_virus_transmission = (body1, body2) => {
+  // transmit virus with some p FROM body1 to body2 IF body1 has it AND body 2 does not
+  if (body1.virusState === 'UNINFECTED' || body2.virusState === 'INFECTED') {
+    return ;
+  }
+  if (distance_f(body1['position'], body2['position']) < MAX_TRANSMISSION_DISTANCE && Math.random() < TRANSMISSION_PROBABILITY) {
+    body2.virusState = 'INFECTED';
+    body2.render.fillStyle = STATUS['INFECTED'];
+  }
+  
 }
 
 const handle_wall_collision = () => {
@@ -241,20 +274,22 @@ const update = () => {
   update_tree();
 	for (let i = 0; i < balls.length; i++) {
     const body = balls[i];
-    if (body.goToCentral !== undefined) {
-      continue; // going to central location
-    }
-    const b = body.position;
-		const matches = TREE.nearest(b, 10, 100);
+    const should_distance = body.goToCentral !== undefined;
+		const matches = TREE.nearest(body, 10, 100); // max nodes: 10, distance: 100
 		if (matches.length <= 1) {
 			// there can be one match, the ball itself
 			continue;
-		}
-		let fv = compute_fv(b, matches[0][0]);
+    }
+    // console.log("MATCH:", matches[0]);
+    let fv = compute_fv(body, matches[0][0]);
+    handle_virus_transmission(body, matches[0][0]);
 		for (let j = 1; j < matches.length; j++) {
-			fv = Matter.Vector.add(fv, compute_fv(b, matches[j][0]));
+      handle_virus_transmission(body, matches[j][0]);
+      if (should_distance) {
+        fv = Matter.Vector.add(fv, compute_fv(body, matches[j][0]));
+      }
 		}
-		Matter.Body.applyForce(body, b, fv);
+		Matter.Body.applyForce(body, body.position, fv);
 	}
   clean_tree();
   
@@ -267,9 +302,10 @@ const walls = createWalls();
 const balls = createBalls();
 World.add(engine.world, walls);
 World.add(engine.world, balls);
+create_central_location(400, 400);
 
 // setup KDTree
-let TREE = new kdTree([], distance_f, ["x", "y"]);
+let TREE = new kdTree([], distance_f, 'position', ['x', 'y']);
 
 Matter.Events.on(engine, "beforeUpdate", update);
 
