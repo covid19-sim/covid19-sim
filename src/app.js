@@ -7,14 +7,23 @@ var Engine = Matter.Engine,
 
 //constants
 const RADIUS = 5;
-const BALL_COUNT = 500;
+const BALL_COUNT = 50;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 800;
 const WALL_THICKNESS = 10;
 const MAX_INITIAL_VELOCITY = 2;
 const WALL_COLLISION_SCALER = 50/100000;
 const MIN_COLLISION_VELOCITY = 2;
-const SOCIAL_DISTANCING_CONSTANT = 50/1000;
+const CENTRAL_LOCATION_LENGTH = 20; // rectangle length
+const CENTRAL_LOCATION_DELAY = 60; // frames per check
+const CENTRAL_LOCATION_VELOCITY = 5;
+
+// will be input from user
+const SOCIAL_DISTANCING_FCONSTANT = 50/1000;
+const P_TO_CENTRAL_LOCATION = 0.05 // translates to every X frames, Y% chance per central location
+
+let FRAME_COUNT = 0;
+let CENTRAL_LOCATIONS = [];
 
 // create an engine
 const engine = Engine.create();
@@ -93,8 +102,91 @@ const createBalls = () => {
     const velocity = {x: vx, y: vy};
     Matter.Body.setVelocity(ball, velocity);
     balls.push(ball);
+    ball.goToCentral = undefined;
   }
   return balls;
+}
+
+const create_central_location = (cx, cy) => {
+  let centralOpts = {
+    render: {
+      fillStyle: '#F35e66',
+      lineWidth: 0,
+    },
+    isStatic: true, 
+    friction: 0, 
+    frictionAir: 0, 
+    frictionStatic: 0
+  };
+  const central = Bodies.rectangle(cx - CENTRAL_LOCATION_LENGTH/2, cy - CENTRAL_LOCATION_LENGTH/2, CENTRAL_LOCATION_LENGTH, CENTRAL_LOCATION_LENGTH, create_central_location);
+  // turns off collisions
+  central.collisionFilter = {
+    'group': -1,
+    'category': 2,
+    'mask': 0,
+  };
+  CENTRAL_LOCATIONS.push(central);
+  console.log(central);
+  World.add(engine.world, central);
+};
+
+const remove_central_location = (idx) => {
+  const central = CENTRAL_LOCATIONS[idx];
+  CENTRAL_LOCATIONS.splice(idx, 1);
+  World.remove(engine.world, central);
+}
+
+create_central_location(400, 400);
+
+const handle_balls_to_central_location = () => {
+  if (CENTRAL_LOCATIONS.length === 0) {
+    return;
+  }
+  for (let i = 0; i < balls.length; i++) {
+    const body = balls[i];
+    const position = body.position;
+    if (body.goToCentral === undefined) {
+      if (FRAME_COUNT % CENTRAL_LOCATION_DELAY != 0) {
+        continue;
+      }
+      let idx = -1;
+      for (let j = 0; j < CENTRAL_LOCATIONS.length; j++) {
+        if (Math.random() < P_TO_CENTRAL_LOCATION) {
+          idx = j; // chose j
+          break;
+        }
+      }
+      if (idx == -1) {
+        continue; // none chosen
+      }
+      // send this ball to a random central location
+      const chosen_location = CENTRAL_LOCATIONS[idx];
+      body.goToCentral = chosen_location;
+      const centerx = chosen_location['position']['x'] + CENTRAL_LOCATION_LENGTH / 2;
+      const centery = chosen_location['position']['y'] + CENTRAL_LOCATION_LENGTH / 2;
+      const vdir = Matter.Vector.normalise(Matter.Vector.create(centerx - position['x'], centery - position['y']));
+      const vv = Matter.Vector.mult(vdir, CENTRAL_LOCATION_VELOCITY);
+      Matter.Body.setVelocity(body, vv);
+      // console.log("moving", i, " to central location");
+    }
+    else {
+      // ball is either going to central location or already there
+      const location = body.goToCentral;
+      const centerx = location['position']['x'] + CENTRAL_LOCATION_LENGTH / 2;
+      const centery = location['position']['y'] + CENTRAL_LOCATION_LENGTH / 2;
+      const dist = Math.sqrt(Math.pow(centerx - position['x'], 2) +  Math.pow(centery - position['y'], 2));
+      if (dist < 40) {
+        // count it as reaching
+        body.goToCentral = undefined;
+      }
+      else if (FRAME_COUNT % 5 === 0) {
+        // give it another boost
+        const vdir = Matter.Vector.normalise(Matter.Vector.create(centerx - position['x'], centery - position['y']));
+        const vv = Matter.Vector.mult(vdir, CENTRAL_LOCATION_VELOCITY);
+        Matter.Body.setVelocity(body, vv);
+      }
+    }
+  }
 }
 
 // Gets distance between two (x,y) points
@@ -110,7 +202,7 @@ const compute_fv = (b1, b2) => {
   let vdir = Matter.Vector.create(b1['x'] - b2['x'], b1['y'] - b2['y']); // points away from b2
   vdir = Matter.Vector.div(vdir, dist) // converts to a unit vector
   // const constant = 100;
-	return Matter.Vector.mult(vdir, SOCIAL_DISTANCING_CONSTANT/(dist**2));
+	return Matter.Vector.mult(vdir, SOCIAL_DISTANCING_FCONSTANT/(dist**2));
 }
 
 const update_tree = () => {
@@ -144,9 +236,14 @@ const handle_wall_collision = () => {
 }
 
 const update = () => {
+  handle_balls_to_central_location();
+
   update_tree();
 	for (let i = 0; i < balls.length; i++) {
-		const body = balls[i];
+    const body = balls[i];
+    if (body.goToCentral !== undefined) {
+      continue; // going to central location
+    }
     const b = body.position;
 		const matches = TREE.nearest(b, 10, 100);
 		if (matches.length <= 1) {
@@ -162,6 +259,7 @@ const update = () => {
   clean_tree();
   
   handle_wall_collision();
+  FRAME_COUNT += 1;
 }
 
 // add all of the bodies to the world
