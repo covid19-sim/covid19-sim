@@ -31,6 +31,7 @@ const STATUS = {
 const INITIAL_INFECTED = 1;
 const MAX_TRANSMISSION_DISTANCE = 40;
 const TRANSMISSION_PROBABILITY = 0.05;
+const RETRANSMISSION_PROBABILITY = 0.01;
 
 const INCUBATION_MEAN = 120; // frames
 const INCUBATION_STD = 30; // frames
@@ -275,10 +276,14 @@ const clean_tree = () => {
 
 const handle_virus_transmission = (body1, body2) => {
   // transmit virus with some p FROM body1 to body2 IF body1 has it AND body 2 does not
-  if (body1.virusState === 'HEALTHY' || body2.virusState === 'INFECTED') {
+  if (body1.virusState === 'HEALTHY' || body1.virusState === 'RECOVERED' || body2.virusState === 'INFECTED') {
     return ;
   }
-  if (distance_f(body1['position'], body2['position']) < MAX_TRANSMISSION_DISTANCE && Math.random() < TRANSMISSION_PROBABILITY) {
+  if (distance_f(body1['position'], body2['position']) < MAX_TRANSMISSION_DISTANCE) {
+    const gets_infected = body2.virusState === 'RECOVERED' ? Math.random() < RETRANSMISSION_PROBABILITY : Math.random() < TRANSMISSION_PROBABILITY;
+    if (!gets_infected) {
+      return ;
+    }
     body2.virusState = 'INFECTED';
     body2.render.fillStyle = STATUS['INFECTED'];
     body2.will_survive = Math.random() > LETHAL_PROBABILITY; // predetermined fate, the puritans had it right
@@ -343,7 +348,6 @@ const handle_incubation = (body) => {
     let res, x, y;
     if (body.will_survive === false) {
       // RIP
-      console.log("F he dead");
       res = getRandomInWalls(DEAD_WALLS);
       x = res[0];
       y = res[1];
@@ -355,7 +359,6 @@ const handle_incubation = (body) => {
       return true;
     }
     // recovered :)
-    console.log("he lives");
     res = getRandomInWalls(MAIN_WALLS);
     x = res[0];
     y = res[1];
@@ -370,8 +373,8 @@ const handle_incubation = (body) => {
     if (body.necessary_frames < INCUBATION_MEAN - INCUBATION_STD * 2) {
       body.necessary_frames = INCUBATION_MEAN - INCUBATION_STD * 2; // minimum
     }
-    body.virusState = 'HEALTHY';
-    body.render.fillStyle = STATUS['HEALTHY'];
+    body.virusState = 'RECOVERED';
+    body.render.fillStyle = STATUS['RECOVERED'];
     body.box = 'main';
   }
   return true;
